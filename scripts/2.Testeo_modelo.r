@@ -345,3 +345,4 @@ cat("\n\n", "========================================\n",
     "\n\n", "========================================\n\n",
     file = "session_info_estabilidad_modelos.txt", append = FALSE)
 
+
