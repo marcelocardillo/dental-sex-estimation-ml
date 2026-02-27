@@ -1,0 +1,33 @@
+
+
+ ========================================
+ INFORMACIÓN DE SESIÓN -  2026-02-21 13:12:21 
+ ========================================
+ Versión de R:  R version 4.5.2 (2025-10-31 ucrt) 
+ Sistema operativo:  Windows 11 x64 (build 26200) 
+ Plataforma:  x86_64-w64-mingw32 
+ CPU:  x86_64 
+
+ Paquetes cargados:
+ tibble v
+  - yardstick v
+  - workflowsets v
+  - workflows v
+  - tune v
+  - tidyr v
+  - tailor v
+  - rsample v
+  - recipes v
+  - purrr v
+  - parsnip v
+  - modeldata v
+  - infer v
+  - ggplot2 v
+  - dplyr v
+  - dials v
+  - scales v
+  - broom v
+  - tidymodels v 
+
+ ========================================
+
