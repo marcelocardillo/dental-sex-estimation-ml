@@ -1,5 +1,5 @@
 # ==============================================================================
-# SCRIPT INTEGRADO: TESTEO DE MODELO PREDICTIVO Y ROBUSTEZ (VER 2)
+# SCRIPT INTEGRADO: TESTEO DE MODELO PREDICTIVO Y ROBUSTEZ (VER 3)
 # Descripción: Evaluación del rol de datos ausentes en modelos predictivos 
 #              (XGBoost para CS y SVM Radial para CI) mediante escenarios 
 #              contrafactuales y bootstrap.
@@ -344,5 +344,6 @@ cat("\n\n", "========================================\n",
           sep=" v", collapse="\n  - "),
     "\n\n", "========================================\n\n",
     file = "session_info_estabilidad_modelos.txt", append = FALSE)
+
 
 
