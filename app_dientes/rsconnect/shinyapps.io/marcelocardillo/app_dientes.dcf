@@ -1,0 +1,10 @@
+name: app_dientes
+title:
+username: marcelocardillo
+account: marcelocardillo
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16775700
+bundleId: 12037648
+url: https://marcelocardillo.shinyapps.io/app_dientes/
+version: 1
