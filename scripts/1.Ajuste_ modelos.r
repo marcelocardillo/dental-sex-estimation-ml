@@ -1,83 +1,94 @@
-# 1: Configuración Inicial
-# Este chunk carga las bibliotecas necesarias para el análisis.
-# Se utiliza tidymodels_prefer() para establecer preferencias de nombres de funciones comunes.
+# ==============================================================================
+# SCRIPT INTEGRADO: EVALUACIÓN COMPARATIVA DE MODELOS DE APRENDIZAJE AUTOMÁTICO
+#APLICADOS A LA ESTIMACIÓN SEXUAL MEDIANTE EL ANÁLISIS MÉTRICO DE CANINOS
+#PERMANENTES.
 
-# Paquetes necesarios
-required_packages <- c(
-  "tidymodels", "ggplot2", "dplyr", "factoextra", "glmnet", "broom", "rsample",
-  "discrim", "vip", "yardstick", "patchwork", "workflows", "shapviz", "tidyr",
-  "klaR", "ranger", "kernlab", "ggbeeswarm", "boot"
-)
+#Leandro Luna, Claudia Aranda y Marcelo Cardillo
 
-# Cargar paquetes
-invisible(lapply(required_packages, library, character.only = TRUE))
+# Descripción: Codigo de entrenamiento y testeo mediante Machine Learning 
+#para Canino Superior (CS) y Canino inferior (CI) 
+# ==============================================================================
+
+# --- BLOQUE R 001 ----------------------------------------------------------
+#paquetes
+library(tidymodels)
+library(ggplot2)
+library(dplyr)
+library(factoextra)
+library(glmnet)
+library(broom)
+library(rsample)
+library(discrim)
+library(vip)
+library(yardstick)
+library(patchwork)
+library(workflows)
+library(shapviz)
+library(tidyr)
+library(klaR)
+library(ranger)
+library(kernlab)
+library(ggbeeswarm)
+library(boot)
 tidymodels_prefer()
 
-# 2: Carga y Exploración Inicial de Datos
-# Carga el archivo de datos 'Dientes.txt' y realiza una primera inspección.
-# Se convierten las variables categóricas 'Ind' y 'Sexo' a factores.
+# --- BLOQUE R 002 ----------------------------------------------------------
+Dent=read.table("Dientes.txt", header=TRUE)
 
-# Verificar existencia del archivo
-if (!file.exists("Dientes.txt")) {
-  stop("Archivo 'Dientes.txt' no encontrado en el directorio de trabajo.")
-}
+head(Dent,20)
 
-# Cargar datos
-Dent <- read.table("Dientes.txt", header = TRUE)
+# --- BLOQUE R 003 ----------------------------------------------------------
+summary(Dent)
 
-# Mostrar primeras filas y resumen estadístico
-print(head(Dent, 20))
-print(summary(Dent))
-
-# Estructura del dataset
 str(Dent)
 
-# Convertir variables categóricas a factores
-Dent$Ind<- as.factor(Dent$Ind)
-Dent$Sexo <- as.factor(Dent$Sexo)
+# --- BLOQUE R 004 ----------------------------------------------------------
+Dent$Ind=as.factor(Dent$Ind)
+Dent$Sexo=as.factor(Dent$Sexo)
 
-# 3: Filtrado y Preparación de Datos para Caninos Superiores (CS)
-# Selecciona los registros correspondientes a Caninos Superiores (CS) y guarda un subconjunto.
+# --- BLOQUE R 005 ----------------------------------------------------------
+###arrancamos con caninos superiores (CS)
 
-# Filtrar para Caninos Superiores (CS)
+
 CS <- Dent %>%
-  dplyr::filter(Tipo_Diente == "CS")
+  filter(Tipo_Diente == "CS")
 
-# Inspección de CS
-print(summary(CS[, c("MDCo", "BLCo", "MDCu", "BLCu")]))
-print(table(CS$Sexo))
-print(length(unique(CS$Ind)))
+#chequeando
+#cuántos dientes,
+#distribución por sexo,
+#n individuos
+
+summary(CS[,c("MDCo","BLCo","MDCu","BLCu")])
+table(CS$Sexo)
+length(unique(CS$Ind))
 
 
-# Guardar archivo de CS para análisis posteriores
+
+# --- BLOQUE R 006 ----------------------------------------------------------
+##archivo de CS para análisis posteriores
+
 write.table(
   CS,
   file = "caninos_superiores.txt",
   sep = "\t",
-  row.names = FALSE
-)
+  row.names = FALSE)
 
-# 4: Gráfico de Variables para CS y CI
-# Crea un boxplot para visualizar las métricas dentales por sexo y tipo de diente (CS y CI).
 
-# Preparar datos para el gráfico (CS y CI)
-vars_plot <- c("MDCo", "BLCo", "MDCu", "BLCu")
+# --- BLOQUE R 007 ----------------------------------------------------------
+#grafico variables para CS-CI (todos menos los faltantes)
 
-# Verificar que las variables existan
-missing_vars_plot <- setdiff(vars_plot, names(Dent))
-if(length(missing_vars_plot) > 0) stop("Variables faltantes para el gráfico: ", paste(missing_vars_plot, collapse = ", "))
+vars <- c("MDCo","BLCo","MDCu","BLCu")
 
-datos_long_plot <- Dent %>%
-  dplyr::filter(Tipo_Diente %in% c("CS", "CI")) %>%
-  tidyr::pivot_longer(
-    cols = all_of(vars_plot),
+datos_long <- Dent%>% 
+  filter(Tipo_Diente %in% c("CS","CI")) %>% 
+  pivot_longer(
+    cols = all_of(vars),
     names_to = "Variable",
     values_to = "Valor",
     values_drop_na = TRUE
   )
 
-# Crear y guardar el gráfico
-p1 <- ggplot(datos_long_plot, aes(x = Sexo, y = Valor, fill = Sexo)) +
+ggplot(datos_long, aes(x = Sexo, y = Valor, fill = Sexo)) +
   geom_boxplot(alpha = 0.5, outlier.shape = NA) +
   geom_jitter(width = 0.15, size = 1, alpha = 0.3) +
   facet_grid(Tipo_Diente ~ Variable, scales = "free_y") +
@@ -85,90 +96,105 @@ p1 <- ggplot(datos_long_plot, aes(x = Sexo, y = Valor, fill = Sexo)) +
   labs(
     x = "Sexo",
     y = "Tamaño (mm)",
-    title = "Métricas dentales para CS y CI"
+    title = "Métricas dentales"
   ) +
   theme(legend.position = "none")
 
-ggsave("boxplot_CS_CI.jpg", plot = p1, width = 20, height = 15, units = "cm", dpi = 300)
+# --- BLOQUE R 008 ----------------------------------------------------------
+ggsave("boxplot_CS_CI.jpg", width = 20, height = 15, units = "cm", dpi = 300)
 
-# 5: Cálculo del Índice de Garn y Bootstrap
-# Calcula el índice de dimorfismo sexual (Garn) y sus intervalos de confianza mediante bootstrap.
+# --- BLOQUE R 009 ----------------------------------------------------------
+# Comparación entre sexos: Mann-Whitney U con ajuste de Holm-Bonferroni
 
-# Calcular Garn index para CS y CI
-vars_garn <- c("MDCo", "BLCo", "MDCu", "BLCu")
 
-# Verificar que las variables existan
-missing_vars_garn <- setdiff(vars_garn, names(Dent))
-if(length(missing_vars_garn) > 0) stop("Variables faltantes para Garn: ", paste(missing_vars_garn, collapse = ", "))
+comparacion_sexos <- datos_long %>%
+  group_by(Tipo_Diente, Variable) %>%
+  summarise(
+    n_M = sum(Sexo == "M"),
+    n_F = sum(Sexo == "F"),
+    mediana_M = median(Valor[Sexo == "M"], na.rm = TRUE),
+    mediana_F = median(Valor[Sexo == "F"], na.rm = TRUE),
+    p = wilcox.test(Valor ~ Sexo, exact = FALSE)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p_ajustado = p.adjust(p, method = "holm")
+  )
 
-datos_long_garn <- Dent %>%
-  dplyr::filter(Tipo_Diente %in% c("CS", "CI")) %>%
-  tidyr::pivot_longer(
-    cols = all_of(vars_garn),
+comparacion_sexos
+
+# --- BLOQUE R 010 ----------------------------------------------------------
+## computar Garn index
+vars <- c("MDCo","BLCo","MDCu","BLCu")
+
+garn <- Dent %>% 
+  filter(Tipo_Diente %in% c("CS","CI")) %>% 
+  pivot_longer(
+    cols = all_of(vars),
+    names_to = "Variable",
+    values_to = "Valor",
+    values_drop_na = TRUE
+  ) %>% 
+  group_by(Tipo_Diente, Variable, Sexo) %>% 
+  summarise(media = mean(Valor), .groups = "drop") %>% 
+  pivot_wider(names_from = Sexo, values_from = media) %>% 
+  mutate(Garn = (M - F) / F * 100)
+
+# --- BLOQUE R 011 ----------------------------------------------------------
+##bootstrap para CI
+garn_boot <- function(Dent, nboot = 5000){
+  
+  res <- replicate(nboot, {
+    
+    F_sample <- sample(Dent$Valor[Dent$Sexo == "F"], replace = TRUE)
+    M_sample <- sample(Dent$Valor[Dent$Sexo == "M"], replace = TRUE)
+    
+    F_mean <- mean(F_sample, na.rm = TRUE)
+    M_mean <- mean(M_sample, na.rm = TRUE)
+    
+    (M_mean - F_mean) / F_mean * 100
+    
+  })
+  
+  c(
+    SD = mean(res),
+    CI_low = quantile(res, 0.025),
+    CI_high = quantile(res, 0.975)
+  )
+}
+
+###aplicarlo a cada diente
+
+vars <- c("MDCo","BLCo","MDCu","BLCu")
+
+datos_long <- Dent %>%
+  filter(Tipo_Diente %in% c("CS","CI")) %>%
+  pivot_longer(
+    cols = all_of(vars),
     names_to = "Variable",
     values_to = "Valor",
     values_drop_na = TRUE
   )
-
-garn <- datos_long_garn %>%
-  group_by(Tipo_Diente, Variable, Sexo) %>%
-  summarise(media = mean(Valor, na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(names_from = Sexo, values_from = media) %>%
-  mutate(Garn = (M - F) / F * 100)
-
-# Función de bootstrap para intervalos de confianza del índice Garn
-# Corregido: la función ahora usa 'grupo_datos' en lugar de 'CS' global.
-garn_boot <- function(grupo_datos, nboot = 5000) {
-  # grupo_datos debe tener columnas 'Valor' y 'Sexo'
-  F_vals <- grupo_datos$Valor[grupo_datos$Sexo == "F"]
-  M_vals <- grupo_datos$Valor[grupo_datos$Sexo == "M"]
-
-  if(length(F_vals) < 2 || length(M_vals) < 2) {
-    warning("No hay suficientes datos para ambos sexos en este grupo.")
-    return(c(SD = NA, CI_low = NA, CI_high = NA))
-  }
-
-  res <- replicate(nboot, {
-    F_sample <- sample(F_vals, replace = TRUE)
-    M_sample <- sample(M_vals, replace = TRUE)
-
-    F_mean <- mean(F_sample, na.rm = TRUE)
-    M_mean <- mean(M_sample, na.rm = TRUE)
-
-    if(F_mean == 0) { # Evitar división por cero
-      return(NA)
-    }
-    (M_mean - F_mean) / F_mean * 100
-  })
-
-  res <- res[!is.na(res)] # Remover NAs generados por división por cero
-  if(length(res) == 0) return(c(SD = NA, CI_low = NA, CI_high = NA))
-
-  c(
-    SD = mean(res),
-    CI_low = quantile(res, 0.025, names = FALSE),
-    CI_high = quantile(res, 0.975, names = FALSE)
-  )
-}
-
-# Aplicar bootstrap a cada combinación de Tipo_Diente y Variable
-garn_results <- datos_long_garn %>%
+##boot x diente
+garn_results <- datos_long %>%
   group_by(Tipo_Diente, Variable) %>%
-  group_modify(~ {
-    boot_result <- garn_boot(.x) # .x es el subconjunto del grupo actual
+  group_modify(~{
+    
+    boot <- garn_boot(.x)
+    
     data.frame(
-      SD = boot_result[1],
-      CI_low = boot_result[2],
-      CI_high = boot_result[3]
+      SD = boot[1],
+      CI_low = boot[2],
+      CI_high = boot[3]
     )
+    
   }) %>%
   ungroup()
 
-# Unir resultados Garn con intervalos
-garn_final <- left_join(garn, garn_results, by = c("Tipo_Diente", "Variable"))
+# --- BLOQUE R 012 ----------------------------------------------------------
+##Grafico CS-CI con Garn index
 
-# Gráfico CS-CI con Garn index
-p_base <- ggplot(datos_long_garn, aes(x = Sexo, y = Valor, fill = Sexo)) +
+p <- ggplot(datos_long, aes(x = Sexo, y = Valor, fill = Sexo)) +
   geom_boxplot(alpha = 0.5, outlier.shape = NA) +
   geom_jitter(width = 0.15, size = 0.7, alpha = 0.5) +
   facet_grid(Tipo_Diente ~ Variable, scales = "free_y") +
@@ -179,35 +205,55 @@ p_base <- ggplot(datos_long_garn, aes(x = Sexo, y = Valor, fill = Sexo)) +
   ) +
   theme(legend.position = "none")
 
-# Agregar texto de Garn y CI
-p_with_labels <- p_base +
-  geom_text(
-    data = garn_final,
-    aes(
-      x = 1.5, # Centrado entre las categorias
-      y = Inf,
-      label = paste0("SDI = ", round(SD, 1), "%\n", "95% CI [", round(CI_low, 1), ", ", round(CI_high, 1), "]")
-    ),
-    vjust = 1.3,
-    hjust = 0.5, # Centrado horizontal
-    inherit.aes = FALSE,
-    size = 2.5
-  )
 
-print(p_with_labels)
-ggsave("medidas_CS_CI+Garn.jpg", plot = p_with_labels, width = 20, height = 15, units = "cm", dpi = 300)
+p +
+geom_text(
+  data = garn,
+  aes(
+    x = 1,
+    y = Inf,
+    label = paste0("SD = ", round(Garn,1), "%")
+  ),
+  vjust = 1.5,
+  inherit.aes = FALSE,
+  size = 3
+)
 
-# 6: Gráfico de Intervalos de Confianza del Garn
-# Visualiza los índices de Garn con sus intervalos de confianza bootstrap.
-
-# Preparar datos para el gráfico de intervalos
-garn_for_plot <- garn_final %>%
+##integrar al grafico 
+garn_results <- garn_results %>%
   mutate(
-    Variable = factor(Variable, levels = c("MDCo", "BLCo", "MDCu", "BLCu"))
+    label = paste0(
+      "SDI = ", round(SD,1), "%\n",
+      "95% CI [", round(CI_low,1), ", ", round(CI_high,1), "]"
+    )
   )
 
-#graficar Garn con intervalos
-p_dim <- ggplot(garn_for_plot,
+p +
+geom_text(
+  data = garn_results,
+  aes(
+    x = 1,
+    y = Inf,
+    label = label
+  ),
+  vjust = 1.3,
+  inherit.aes = FALSE,
+  size = 2
+)
+
+# --- BLOQUE R 013 ----------------------------------------------------------
+ggsave("medidas_CS_CI+Garn.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+# --- BLOQUE R 014 ----------------------------------------------------------
+#Confidence intervals+media
+garn_results <- garn_results %>%
+  mutate(Variable = factor(
+    Variable,
+    levels = c("MDCo","BLCo","MDCu","BLCu")
+  ))
+
+
+p_dim <- ggplot(garn_results,
        aes(x = SD, y = Variable, color = Tipo_Diente)) +
   
   geom_vline(xintercept = 0,
@@ -219,7 +265,8 @@ p_dim <- ggplot(garn_for_plot,
     aes(xmin = CI_low, xmax = CI_high),
     width = 0.15,
     linewidth = 1,
-    position = position_dodge(width = 0 )  +
+    position = position_dodge(width = 0.5)
+  ) +
   
   geom_point(
     size = 3,
@@ -229,11 +276,9 @@ p_dim <- ggplot(garn_for_plot,
   theme_classic(base_size = 13) +
   
   labs(
-    x = "Sexual Dimorphism Index (%)",
-    y = "Dental measurement",
-    color = "Tooth",
-    title = "Garn index with bootstrap 95% confidence intervals"
-  ) +
+    x = "Dimorfismo sexual (%)",
+    y = "Medida dental",
+    color = "Diente") +
   
   scale_color_manual(
     values = c(
@@ -242,29 +287,33 @@ p_dim <- ggplot(garn_for_plot,
     )
   )
 
-print(p_dim)
-ggsave("Intervalo_confianza_Garn.jpg", plot = p_dim, width = 20, height = 15, units = "cm", dpi = 300)
+p_dim 
 
-# 7: Función de División de Datos
-# Define una función para dividir los datos manteniendo la proporción de sexo y evitando duplicación de individuos entre entrenamiento y testeo.
+# --- BLOQUE R 015 ----------------------------------------------------------
+ggsave("Intervalo_confianza_Garn.jpg", width = 20, height = 15, units = "cm", dpi = 300)
 
-# Función para dividir datos estratificando por Sexo y agrupando por Individuo
+# --- BLOQUE R 016 ----------------------------------------------------------
+##ANALISIS##
+##funcion de division por tipo de diente 80 20 tomando en cuenta por sexo e 
+#individuo y controlando por completitud de datos
+
+
 split_dentales <- function(data, prop = 0.8) {
+  
   required_cols <- c("Ind", "Sexo")
   missing <- setdiff(required_cols, names(data))
   if(length(missing) > 0){
-    stop(paste("Faltan columnas requeridas:", 
+    stop(paste("Faltan columnas:", 
                paste(missing, collapse = ", ")))
   }
   
-  set.seed(123) # Semilla para reproducibilidad
+  set.seed(123)
   
   split_obj <- group_initial_split(
     data,
     prop = prop,
-    group = Ind,     # Agrupa por individuo
-    strata = Sexo    # Estratifica por sexo
-  )
+    group = Ind,     # x individuo
+    strata = Sexo)   # por sexo
   
   list(
     train = training(split_obj),
@@ -273,281 +322,1238 @@ split_dentales <- function(data, prop = 0.8) {
   )
 }
 
-# 8: División de Datos para CS
-# Aplica la función de división al dataset de Caninos Superiores (CS).
 
-# Dividir la muestra CS
-cs_split <- split_dentales(CS)
 
-cs_train <- cs_split$train # Entrenamiento
-cs_test <- cs_split$test   # Testeo
+# --- BLOQUE R 017 ----------------------------------------------------------
+#division de la muestra con la funcion anterior
 
-# Verificar divisiones
-print(summary(cs_train))
-print(summary(cs_test))
+cs_split =split_dentales(CS)
 
-# Chequeo de individuos repetidos
-print(paste("Intersección de individuos entre train y test:", length(intersect(unique(cs_train$Ind), unique(cs_test$Ind)))))
+cs_train = cs_split$train#entrenamiento
+cs_test = cs_split$test#testeo
 
-# 9: Limpieza y Preparación de Receta para CS
-# Imputa valores faltantes en el conjunto de entrenamiento y define la receta de preprocesamiento.
 
-# Remover fila completamente NA en train (si existe)
-n_rows_before <- nrow(cs_train)
+# --- BLOQUE R 018 ----------------------------------------------------------
+summary(cs_train)
+summary(cs_test)
+
+# --- BLOQUE R 019 ----------------------------------------------------------
+###chequeo de que no estemos repitiendo individuos en el muestreo
+length(intersect(unique(cs_train$Ind), unique(cs_test$Ind)))
+
+
+# --- BLOQUE R 020 ----------------------------------------------------------
+
+###chequeo de los datos a imputar
+cs_train %>%
+  filter(is.na(MDCo) & is.na(BLCo) & is.na(MDCu) & is.na(BLCu))
+
+
+# --- BLOQUE R 021 ----------------------------------------------------------
+##remover NA
 cs_train <- cs_train %>%
-  dplyr::filter(!(is.na(MDCo) & is.na(BLCo) & is.na(MDCu) & is.na(BLCu)))
-n_rows_after <- nrow(cs_train)
-if(n_rows_before != n_rows_after) cat("Eliminada 1 fila con todos los predictores NA en cs_train.\n")
+  filter(!(is.na(MDCo) & is.na(BLCo) & is.na(MDCu) & is.na(BLCu)))
 
-# Chequeo post-limpieza
-check_na_all_na <- cs_train %>%
-  dplyr::filter(is.na(MDCo) & is.na(BLCo) & is.na(MDCu) & is.na(BLCu))
-if(nrow(check_na_all_na) > 0) cat("Advertencia: Aún hay filas con todos los predictores NA en cs_train.\n")
+##chequeo
+cs_train %>%
+  filter(is.na(MDCo) & is.na(BLCo) & is.na(MDCu) & is.na(BLCu))
 
-# Definir receta de preprocesamiento para CS
-# La receta se ajusta solo al conjunto de entrenamiento
+
+
+# --- BLOQUE R 022 ----------------------------------------------------------
+##imputacion y estandarizacion. Aca usamos el knn como se utilizo antes apara 
+#armar la formula solo en el training data, para evitar fuga de informacion 
+#del test set. Despues vamos a aplicar la misma receta al test set
+
+
 cs_recipe <- recipe(Sexo ~ MDCo + BLCo + MDCu + BLCu, data = cs_train) %>%
-  step_impute_knn(all_predictors()) %>% # Imputación KNN
-  step_normalize(all_predictors())      # Estandarización
+  step_impute_knn(all_predictors()) %>%
+  step_normalize(all_predictors())
 
-# Preparar la receta (esto ajusta los parámetros de imputación y normalización)
-cs_recipe_prep <- prep(cs_recipe)
-print(juice(cs_recipe_prep)) # Ver datos procesados
 
-# 10: Validación Cruzada para CS
-# Configura la validación cruzada estratificada y agrupada para evitar pseudorreplicación.
+# --- BLOQUE R 023 ----------------------------------------------------------
+###chequeo de los datos
+prep(cs_recipe)
 
-# Configurar validación cruzada agrupada por Ind y estratificada por Sexo
+
+# --- BLOQUE R 024 ----------------------------------------------------------
+##base de control con validacion cruzada por individuo y sexo para evitar 
+#pseudorreplicacion 
+
 set.seed(123)
-cv_cs <- group_vfold_cv(
-  cs_train,
-  v = 10,       # 10 folds
-  repeats = 5,  # 5 repeticiones
-  group = Ind,  # Agrupar por individuo
-  strata = Sexo # Estratificar por sexo
-)
 
-# Verificar estructura de los folds
-print(cv_cs)
+cv_cs =
+  group_vfold_cv(
+    cs_train,
+    v = 10,
+    repeats=5,
+    group = Ind,
+    strata = Sexo)
 
-# 11: Definición de Métricas y Control
-# Define las métricas de evaluación y el control para los remuestreos.
 
-# Métricas de evaluación
-metricas <- metric_set(
-  accuracy,
-  sens,
-  spec,
-  bal_accuracy,
-  roc_auc
-)
+# --- BLOQUE R 025 ----------------------------------------------------------
+##metricas para extraer
 
-# Control de remuestreo
-ctrl <- control_resamples(save_pred = TRUE)
+metricas =
+  metric_set(
+    accuracy,
+    sens,
+    spec,
+    bal_accuracy,
+    roc_auc
+  )
 
-# Workflow base para CS
-cs_wf <- workflow() %>%
+ctrl =
+  control_resamples(save_pred = TRUE)
+
+
+# --- BLOQUE R 026 ----------------------------------------------------------
+##arma el workflow para el modelo
+cs_wf =
+  workflow() %>%
   add_recipe(cs_recipe)
 
-# 12: Definición y Evaluación de Modelos para CS
-# Define y evalúa múltiples modelos de clasificación en el conjunto de validación cruzada de CS.
 
-# --- Modelo 1: Regresión Logística ---
-log_spec <- logistic_reg(mode = "classification") %>%
+# --- BLOQUE R 027 ----------------------------------------------------------
+
+####Modelos###############
+
+# Regresion logistica
+
+
+log_spec =
+  logistic_reg(mode = "classification") %>%
   set_engine("glm")
 
-log_wf <- workflow() %>%
+log_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(log_spec)
 
-log_res <- fit_resamples(
-  log_wf,
-  resamples = cv_cs,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(log_res))
+log_res =
+  fit_resamples(
+    log_wf,
+    resamples = cv_cs,
+    control = ctrl,
+    metrics = metricas
+  )
 
-# --- Modelo 2: Elastic Net ---
-enet_spec <- logistic_reg(
-  penalty = tune(), # Parámetro lambda para penalización
-  mixture = tune()  # Parámetro alpha (0=Ridge, 1=Lasso)
-) %>%
-  set_engine("glmnet") %>%
+collect_metrics(log_res)   ##metricas
+
+
+# --- BLOQUE R 028 ----------------------------------------------------------
+# ELASTIC NET
+
+##regresion logistica con regularizacion
+enet_spec =
+  logistic_reg(
+    penalty = tune(),#valor de lamda que va a penalizar los coeficientes para
+    #obtener los mas pequeños posibles, en este caso esta en automatico
+    mixture = tune()#tipo de penalizacion o alfa, 0 ridge, 1 lasso, entre 0 y 1.
+    #automatica tambien
+  ) %>%
+  set_engine("glmnet") %>% #motor de ajuste del modelo
   set_mode("classification")
 
-enet_wf <- workflow() %>%
+enet_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(enet_spec)
 
-enet_grid <- grid_regular(
-  penalty(range = c(-4, 0)),  # Rango en escala logarítmica
-  mixture(range = c(0, 1)),   # Valores entre Ridge y Lasso
-  levels = 10                 # 10x10 = 100 combinaciones
-)
+#recipe = cómo se procesan datos (imputación + estandarización, etc.)
+#model = qué modelo entrenar
+
+enet_grid =
+  grid_regular(penalty(range = c(-4, 0)), # grilla de combinaciones de las variable 
+  # testeo y  penalizacion (en escala log)
+    mixture(range = c(0, 1)), # 0=ridge, 1=lasso. valores intermedios = elastic net
+    levels = 10 #se evaluan 10x10 combinaciones alpha y lambda (100 modelos)
+  )
 
 set.seed(123)
-enet_res <- tune_grid(
-  enet_wf,
-  resamples = cv_cs,
-  grid = enet_grid,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(enet_res))
+#todos los modelos se prueban con validacion cruzada y se estima balanced accuracy
+#como metrica principal
+enet_res =
+  tune_grid(
+    enet_wf,
+    resamples = cv_cs,
+    grid = enet_grid,
+    control = ctrl,
+    metrics = metricas
+  )
 
-# --- Modelo 3: LDA ---
-lda_spec <- discrim_linear() %>%
+collect_metrics(enet_res)
+
+best_enet =
+  select_best(enet_res, metric = "bal_accuracy") #seleccion y almacenamiento del mejor
+  #modelo
+
+best_enet
+
+
+# --- BLOQUE R 029 ----------------------------------------------------------
+
+# LDA
+
+lda_spec =
+  discrim_linear() %>%
   set_engine("MASS")
 
-lda_wf <- workflow() %>%
+lda_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(lda_spec)
 
-lda_res <- fit_resamples(
-  lda_wf,
-  resamples = cv_cs,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(lda_res))
+##prueba de los modelos con validacion cruzada
+lda_res =
+  fit_resamples(
+    lda_wf,
+    resamples = cv_cs,
+    metrics = metricas,
+    control = ctrl
+  )
 
-# --- Modelo 4: Naive Bayes ---
-nb_spec <- naive_Bayes() %>%
-  set_engine("klaR")
+collect_metrics(lda_res)
 
-nb_wf <- workflow() %>%
+
+# --- BLOQUE R 030 ----------------------------------------------------------
+
+# NAIVE BAYES
+
+#especificacion del modelo
+nb_spec =
+  naive_Bayes() %>%
+  set_engine("klaR")##usa paquete klaR para ajuste
+
+#receta del modelo
+nb_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(nb_spec)
 
-nb_res <- fit_resamples(
-  nb_wf,
-  resamples = cv_cs,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(nb_res))
+##prueba de los modelos con validacion cruzada
+nb_res =
+  fit_resamples(
+    nb_wf,
+    resamples = cv_cs,
+    metrics = metricas,
+    control = ctrl)
 
-# --- Modelo 5: Random Forest ---
-rf_spec <- rand_forest(
-  trees = 1000,      # Número de árboles
-  mtry = tune(),     # Número de variables para splits
-  min_n = tune()     # Mínimo número de observaciones en nodos hoja
-) %>%
+collect_metrics(nb_res)
+
+
+# --- BLOQUE R 031 ----------------------------------------------------------
+
+# RANDOM FOREST (con tuning )
+
+rf_spec =
+  rand_forest(
+    trees = 1000,#1000 arboles estabilizar busqueda y parametros
+    mtry = tune(),
+    min_n = tune()
+  ) %>%
   set_engine("ranger") %>%
   set_mode("classification")
 
-rf_wf <- workflow() %>%
+rf_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(rf_spec)
 
-rf_grid <- grid_regular(
-  mtry(range = c(1, 4)),
-  min_n(range = c(2, 20)),
-  levels = 6 # 4x6 = 24 combinaciones
-)
+rf_grid =
+  grid_regular(
+    mtry(range = c(1, 4)),##entrenamos con todos los split para el nodo con 1,
+    #2, 3 y hasta 4 predictores, va a dar arboles mas y menos aletorios
+    min_n(range = c(2, 20)),
+    levels = 6 #da unos 36 modelos o combinaciones x prueba
+  )
+
 
 set.seed(123)
-rf_res <- tune_grid(
-  rf_wf,
-  resamples = cv_cs,
-  grid = rf_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(rf_res))
 
-# --- Modelo 6: SVM Lineal ---
-svm_lin_spec <- svm_linear(cost = tune()) %>%
+rf_res =
+  tune_grid(
+    rf_wf,
+    resamples = cv_cs,
+    grid = rf_grid,
+    metrics = metricas,
+    control = ctrl)
+
+collect_metrics(rf_res)
+
+best_rf =
+  select_best(rf_res, metric = "bal_accuracy")
+
+best_rf
+
+
+# --- BLOQUE R 032 ----------------------------------------------------------
+
+# SVM lineal
+
+
+svm_lin =
+  svm_linear(cost = tune()) %>%
   set_engine("kernlab") %>%
   set_mode("classification")
 
-svm_lin_wf <- workflow() %>%
+svm_lin_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
-  add_model(svm_lin_spec)
+  add_model(svm_lin)
 
-svm_lin_grid <- grid_regular(
-  cost(range = c(-3, 2)), # Rango del parámetro de penalización C
-  levels = 10
-)
+svm_lin_grid =
+  grid_regular(cost(range = c(-3, 2)), levels = 10)
 
 set.seed(123)
-svm_lin_res <- tune_grid(
-  svm_lin_wf,
-  resamples = cv_cs,
-  grid = svm_lin_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(svm_lin_res))
 
-# --- Modelo 7: SVM Radial ---
-svm_rad_spec <- svm_rbf(
-  cost = tune(),
-  rbf_sigma = tune()
-) %>%
+svm_lin_res =
+  tune_grid(
+    svm_lin_wf,
+    resamples = cv_cs,
+    grid = svm_lin_grid,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(svm_lin_res)
+
+best_svm_lin =
+  select_best(svm_lin_res, metric = "bal_accuracy")
+best_svm_lin
+
+
+# --- BLOQUE R 033 ----------------------------------------------------------
+
+# SVM RADIAL CS
+
+svm_rad =
+  svm_rbf(
+    cost = tune(),
+    rbf_sigma = tune()
+  ) %>%
   set_engine("kernlab") %>%
   set_mode("classification")
 
-svm_rad_wf <- workflow() %>%
+svm_rad_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
-  add_model(svm_rad_spec)
+  add_model(svm_rad)
 
-svm_rad_grid <- grid_regular(
-  cost(range = c(-2, 2)),
-  rbf_sigma(range = c(-3, -1)),
-  levels = 6
-)
+svm_rad_grid =
+  grid_regular(
+    cost(range = c(-2, 2)),        # 0.01 a 100
+    rbf_sigma(range = c(-3, -1)),  # rango más razonable
+    levels = 6
+  )
 
 set.seed(123)
-svm_rad_res <- tune_grid(
-  svm_rad_wf,
-  resamples = cv_cs,
-  grid = svm_rad_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(svm_rad_res))
 
-# --- Modelo 8: XGBoost ---
-xgb_spec <- boost_tree(
-  trees = 800,              # Número de árboles
-  learn_rate = tune(),      # Tasa de aprendizaje
-  mtry = tune(),            # Variables por split
-  tree_depth = tune(),      # Profundidad máxima de los árboles
-  min_n = tune(),           # Mínimo nodos hoja
-  loss_reduction = tune()   # Reducción mínima de pérdida
-) %>%
+svm_rad_res =
+  tune_grid(
+    svm_rad_wf,
+    resamples = cv_cs,
+    grid = svm_rad_grid,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(svm_rad_res)
+
+best_svm_rad =
+  select_best(svm_rad_res, metric = "bal_accuracy")
+best_svm_rad
+
+
+# --- BLOQUE R 034 ----------------------------------------------------------
+
+# XGBOOST CS
+
+
+xgb_spec =
+  boost_tree(
+    trees = 800,#800 arboles
+    learn_rate = tune(),
+    mtry = tune(),
+    tree_depth = tune(),
+    min_n = tune(),
+    loss_reduction = tune()
+  ) %>%
   set_engine("xgboost") %>%
   set_mode("classification")
 
-xgb_wf <- workflow() %>%
+xgb_wf =
+  workflow() %>%
   add_recipe(cs_recipe) %>%
   add_model(xgb_spec)
 
-xgb_grid <- grid_space_filling(
-  learn_rate(range = c(-3, -1)),      # 0.001 a 0.1
-  mtry(range = c(1, 4)),
-  tree_depth(range = c(2L, 6L)),
-  min_n(range = c(2L, 15L)),
-  loss_reduction(range = c(-5, -1)),  # 1e-5 a 0.1
-  size = 25                           # 25 combinaciones
-)
+xgb_grid =
+  grid_space_filling(
+    learn_rate(range = c(-3, -1)),      # 0.001 a 0.1
+    mtry(range = c(1, 4)),
+    tree_depth(range = c(2L, 6L)),      # profundidad moderada
+    min_n(range = c(2L, 15L)),
+    loss_reduction(range = c(-5, -1)),  # 1e-5 a 0.1
+    size = 25
+  )
 
 set.seed(123)
-xgb_res <- tune_grid(
-  xgb_wf,
-  resamples = cv_cs,
-  grid = xgb_grid,
-  metrics = metricas,
-  control = ctrl
+
+xgb_res =
+  tune_grid(
+    xgb_wf,
+    resamples = cv_cs,
+    grid = xgb_grid,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(xgb_res)
+
+best_xgb =
+  select_best(xgb_res, metric = "bal_accuracy")
+
+xgb_final_wf <- finalize_workflow(xgb_wf, best_xgb)
+
+xgb_fit <- fit(
+  xgb_final_wf,
+  data = cs_train
 )
-print(collect_metrics(xgb_res))
 
-# 13: Comparación de Modelos para CS
-# Resume las métricas de desempeño de todos los modelos de CS y determina el mejor.
+best_xgb
 
-# Funciones auxiliares para extraer métricas de los resultados de los modelos
+
+# --- BLOQUE R 035 ----------------------------------------------------------
+##recoleccion de la metrica de clasificacion
+
+## ---- funcion auxiliar para modelos sin tuning ----
+extraer_simple <- function(res_obj, nombre_modelo) {
+  collect_metrics(res_obj, summarize = FALSE) %>%
+    dplyr::filter(.metric == "bal_accuracy") %>%
+    dplyr::summarise(
+      mean_BA = mean(.estimate),
+      sd_BA   = sd(.estimate)
+    ) %>%
+    dplyr::mutate(modelo = nombre_modelo)
+}
+
+## ---- funcion auxiliar para modelos con tuning ----
+extraer_tuneado <- function(res_obj, nombre_modelo) {
+
+  # identificar mejor configuración
+  best_id <- select_best(res_obj, metric = "bal_accuracy")$.config
+
+  collect_metrics(res_obj, summarize = FALSE) %>%
+    dplyr::filter(.metric == "bal_accuracy",
+                  .config == best_id) %>%
+    dplyr::summarise(
+      mean_BA = mean(.estimate),
+      sd_BA   = sd(.estimate)
+    ) %>%
+    dplyr::mutate(modelo = nombre_modelo)
+}
+
+## ---- recoleccion robusta ----
+comparacion_modelos <-
+  bind_rows(
+
+    extraer_simple(log_res, "Logistic"),
+    extraer_tuneado(enet_res, "Elastic Net"),
+    extraer_simple(lda_res, "LDA"),
+    extraer_simple(nb_res, "Naive Bayes"),
+    extraer_tuneado(rf_res, "Random Forest"),
+    extraer_tuneado(svm_lin_res, "SVM Linear"),
+    extraer_tuneado(svm_rad_res, "SVM Radial"),
+    extraer_tuneado(xgb_res, "XGBoost")
+
+  ) %>%
+  dplyr::arrange(desc(mean_BA))
+
+comparacion_modelos
+
+
+
+# --- BLOQUE R 036 ----------------------------------------------------------
+##Compracion estadistica entre modelos
+#extraccion de parametros estimados
+
+##1- funcion
+
+extraer_resamples_simple <- function(res_obj, nombre_modelo) {
+  
+  collect_metrics(res_obj, summarize = FALSE) %>%
+    filter(.metric == "bal_accuracy") %>%
+    select(id, id2, .estimate) %>%
+    mutate(modelo = nombre_modelo)
+}
+
+
+extraer_resamples_tuneado <- function(res_obj, nombre_modelo) {
+  
+  best_id <- select_best(res_obj, metric = "bal_accuracy")$.config
+  
+  collect_metrics(res_obj, summarize = FALSE) %>%
+    filter(.metric == "bal_accuracy",
+           .config == best_id) %>%
+    select(id, id2, .estimate) %>%
+    mutate(modelo = nombre_modelo)
+}
+
+
+##2-objeto
+resamples_CS <-
+  bind_rows(
+    
+    extraer_resamples_simple(log_res, "Logistic"),
+    extraer_resamples_tuneado(enet_res, "Elastic Net"),
+    extraer_resamples_simple(lda_res, "LDA"),
+    extraer_resamples_simple(nb_res, "Naive Bayes"),
+    extraer_resamples_tuneado(rf_res, "Random Forest"),
+    extraer_resamples_tuneado(svm_lin_res, "SVM Linear"),
+    extraer_resamples_tuneado(svm_rad_res, "SVM Radial"),
+    extraer_resamples_tuneado(xgb_res, "XGBoost")
+    
+  )
+
+
+# --- BLOQUE R 037 ----------------------------------------------------------
+#check
+resamples_CS
+
+# --- BLOQUE R 038 ----------------------------------------------------------
+##matriz
+resamples_CS_wide <-
+  resamples_CS %>%
+  select(id, id2, modelo, .estimate) %>%
+  tidyr::pivot_wider(
+    names_from = modelo,
+    values_from = .estimate
+  )
+
+# --- BLOQUE R 039 ----------------------------------------------------------
+##check (dimensiones y composicion de la matriz)
+dim(resamples_CS_wide)
+head(resamples_CS_wide)
+
+# --- BLOQUE R 040 ----------------------------------------------------------
+##test pareadeo de Friedman (global) con comparaciones de a pares ajustadas x Holm-Bonferroni
+
+friedman.test(
+  y = as.matrix(
+    resamples_CS_wide %>%
+      select(
+        Logistic,
+        `Elastic Net`,
+        LDA,
+        `Naive Bayes`,
+        `Random Forest`,
+        `SVM Linear`,
+        `SVM Radial`,
+        XGBoost
+      )))
+
+
+# --- BLOQUE R 041 ----------------------------------------------------------
+datos_CS <- resamples_CS_wide %>%
+  select(
+    id, id2,
+    Logistic,
+    `Elastic Net`,
+    LDA,
+    `Naive Bayes`,
+    `Random Forest`,
+    `SVM Linear`,
+    `SVM Radial`,
+    XGBoost
+  )
+
+modelos <- names(datos_CS)[3:10]
+
+comparaciones_CS <- combn(modelos, 2, simplify = FALSE) %>%
+  map_dfr(function(par) {
+    
+    test <- wilcox.test(
+      datos_CS[[par[1]]],
+      datos_CS[[par[2]]],
+      paired = TRUE,
+      exact = FALSE
+    )
+    
+    tibble(
+      modelo_1 = par[1],
+      modelo_2 = par[2],
+      p = test$p.value
+    )
+    
+  }) %>%
+  mutate(
+    p_ajustado = p.adjust(p, method = "holm")
+  ) %>%
+  arrange(p_ajustado)
+
+##ver
+print(comparaciones_CS, n=28)
+
+
+# --- BLOQUE R 042 ----------------------------------------------------------
+##diferencias medias de BA entre modelos
+resamples_CS_wide %>%
+  summarise(
+    XGB_vs_RF = mean(XGBoost - `Random Forest`),
+    XGB_vs_SVMrad = mean(XGBoost - `SVM Radial`),
+    XGB_vs_NB = mean(XGBoost - `Naive Bayes`),
+    XGB_vs_EN = mean(XGBoost - `Elastic Net`),
+    XGB_vs_Logistic = mean(XGBoost - Logistic),
+    XGB_vs_SVMlin = mean(XGBoost - `SVM Linear`),
+    XGB_vs_LDA = mean(XGBoost - LDA)
+  )
+
+
+# --- BLOQUE R 043 ----------------------------------------------------------
+##XGBOOSt el mejor modelo, asi que predecimos con el
+
+
+#  Generar predicciones (clase + probabilidades)
+
+xgb_pred =
+  predict(xgb_fit, cs_test, type = "prob") %>%
+  bind_cols(predict(xgb_fit, cs_test)) %>%
+  bind_cols(dplyr::select(cs_test, Sexo))
+
+# asegurar que Sexo sea factor x las dudas
+xgb_pred$Sexo = as.factor(xgb_pred$Sexo)
+
+
+
+# Métricas principales de clasificación (Balanced Accuracy = métrica primaria)
+
+
+metricas_clase =
+  metric_set(
+    accuracy,
+    sens,
+    spec,
+    bal_accuracy
+  )
+
+metricas_clase(
+  xgb_pred,
+  truth = Sexo,
+  estimate = .pred_class
+)
+
+
+# ROC – AUC (probabilidades) Seteo F como la clase positiva
+
+roc_auc(
+  xgb_pred,
+  truth = Sexo,
+  .pred_F)
+
+
+# --- BLOQUE R 044 ----------------------------------------------------------
+#curva roc para explorar los umbrales
+roc_curve(
+  xgb_pred,
+  truth = Sexo,
+  .pred_F
+) %>%
+  autoplot()
+
+# --- BLOQUE R 045 ----------------------------------------------------------
+ggsave("ROC_CS.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+# --- BLOQUE R 046 ----------------------------------------------------------
+#Check sobre los resultados antes del remuestreo
+table(xgb_pred$Sexo)
+
+# --- BLOQUE R 047 ----------------------------------------------------------
+############################################################
+## BOOTSTRAP DEL TEST SET – Intervalos de confianza
+############################################################
+
+library(boot)
+
+# Función para extraer métricas en cada remuestreo
+boot_metricas <- function(data, indices) {
+
+  d <- data[indices, ]
+
+  c(
+    bal_acc = bal_accuracy(d, truth = Sexo, estimate = .pred_class)$.estimate,
+    sens    = sens(d, truth = Sexo, estimate = .pred_class)$.estimate,
+    spec    = spec(d, truth = Sexo, estimate = .pred_class)$.estimate,
+    acc     = accuracy(d, truth = Sexo, estimate = .pred_class)$.estimate
+  )
+}
+
+set.seed(123)
+
+boot_res <- boot(
+  data = xgb_pred,
+  statistic = boot_metricas,
+  R = 2000
+)
+
+############################################################
+## Intervalos percentiles 95%
+############################################################
+
+# Balanced Accuracy
+boot.ci(boot_res, type = "perc", index = 1)
+
+# Sensibilidad
+boot.ci(boot_res, type = "perc", index = 2)
+
+# Especificidad
+boot.ci(boot_res, type = "perc", index = 3)
+
+# Accuracy
+boot.ci(boot_res, type = "perc", index = 4)
+
+
+# --- BLOQUE R 048 ----------------------------------------------------------
+
+# Tabla Sensibilidad – Especificidad para grafico
+
+threshold_df =
+  roc_curve(xgb_pred, truth = Sexo, .pred_F) %>%
+  dplyr::select(.threshold, sensitivity, specificity)
+
+# Gráfico Sensibilidad y Especificidad
+
+ggplot(threshold_df, aes(x = .threshold)) +
+  geom_line(aes(y = sensitivity, color = "Sensibilidad"), size = 1) +
+  geom_line(aes(y = specificity, color = "Especificidad"), size = 1) +
+  scale_color_manual(values = c("Sensibilidad" = "red",
+                                "Especificidad" = "blue")) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = "Umbral",
+    y = "Valor",
+    color = "",
+    title = "Sensibilidad y Especificidad según Umbral"
+  )
+
+
+
+# --- BLOQUE R 049 ----------------------------------------------------------
+
+#  Umbral más Balanceado (Sens y Spec)
+
+best_threshold =
+  threshold_df %>%
+  dplyr::mutate(diff = abs(sensitivity - specificity)) %>%
+  dplyr::arrange(diff) %>%
+  dplyr::slice(1)
+
+best_threshold
+
+# --- BLOQUE R 050 ----------------------------------------------------------
+
+#Umbral de Youden J busca el mas explicativo, no necesariamente balanceado
+
+best_youden =
+  threshold_df %>%
+  mutate(J = sensitivity + specificity - 1) %>%
+  arrange(desc(J)) %>%
+ dplyr::slice(1)
+
+best_youden
+
+
+# --- BLOQUE R 051 ----------------------------------------------------------
+##matriz de confusion para predicciones XGBOOST
+conf_mat(
+  xgb_pred,
+  truth = Sexo,
+  estimate = .pred_class
+)
+
+
+# --- BLOQUE R 052 ----------------------------------------------------------
+##importancia de la variables con VIP
+xgb_importance =
+  xgb_fit %>%
+  extract_fit_parsnip() %>%
+  vip::vi()
+
+xgb_importance
+
+# --- BLOQUE R 053 ----------------------------------------------------------
+#grafico
+vip(
+  xgb_fit,
+  num_features = 10,
+  geom = "col",
+  aesthetics = list(fill = "steelblue")
+) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = NULL,
+    y = "Importancia")
+
+
+# --- BLOQUE R 054 ----------------------------------------------------------
+ggsave("Var_Imp_CS.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+
+# --- BLOQUE R 055 ----------------------------------------------------------
+
+###valores del modelo y contribucion de los casos con SHAP
+
+# Extraer el modelo XGBoost
+
+xgb_core = extract_fit_parsnip(xgb_fit)$fit
+
+# Obtener los datos procesados por la formula (recipe)
+
+rec = extract_recipe(xgb_fit)
+
+X_df = bake(rec, new_data = cs_train) %>%
+  dplyr::select(-Sexo)
+
+# Convertir a matriz numérica (XGBoost requiere tipos numéricos) sino da error
+X_matrix = as.matrix(X_df)
+
+## Calcular SHAP 
+
+sv = shapviz(
+  xgb_core,
+  X = X_matrix,      # Datos para los gráficos
+  X_pred = X_matrix, # Datos para la predicción (debe ser matriz)
+  baseline = "auto"
+)
+
+
+# --- BLOQUE R 056 ----------------------------------------------------------
+# Gráfico de importancia de variables SHAP
+sv_importance(sv, kind = "beeswarm")
+
+# --- BLOQUE R 057 ----------------------------------------------------------
+ggsave("Shap_CS.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+# --- BLOQUE R 058 ----------------------------------------------------------
+# Gráficos de dependencia SHAP para cada variable
+
+vars = c("MDCu", "BLCu", "BLCo", "MDCo")
+
+plots =
+  lapply(vars, function(v){
+    sv_dependence(sv, v) +
+      ggtitle(paste("Dependencia SHAP -", v)) +
+      theme_minimal(base_size = 12)
+  })
+
+wrap_plots(plots, ncol = 2)   # equivalente a mfrow=c(2,2)
+
+# --- BLOQUE R 059 ----------------------------------------------------------
+################Ajuste para CI#################
+CI <- Dent %>%
+  filter(Tipo_Diente == "CI")
+
+#chequeando
+#cuántos dientes,
+#distribución por sexo,
+#n individuos
+
+summary(CI[,c("MDCo","BLCo","MDCu","BLCu")])
+table(CI$Sexo)
+length(unique(CI$Ind))
+
+
+
+# --- BLOQUE R 060 ----------------------------------------------------------
+##archivo de CI para análisis posteriores
+
+write.table(
+  CI,
+  file = "caninos_inferiores.txt",
+  sep = "\t",
+  row.names = FALSE)
+
+# --- BLOQUE R 061 ----------------------------------------------------------
+##division muestra con la funcion split_dentales
+
+ci_split =split_dentales(CI)
+
+ci_train = ci_split$train
+ci_test = ci_split$test
+
+
+# --- BLOQUE R 062 ----------------------------------------------------------
+summary(ci_train) 
+summary(ci_test)
+
+# --- BLOQUE R 063 ----------------------------------------------------------
+###chequeo de que no estemos repitiendo individuos en el muestreo
+length(intersect(unique(ci_train$Ind), unique(ci_test$Ind)))
+
+
+# --- BLOQUE R 064 ----------------------------------------------------------
+##imputacion y estandarizacion para CI (train) . 
+
+ci_recipe <- recipe(Sexo ~ MDCo + BLCo + MDCu + BLCu, data = ci_train) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_normalize(all_predictors())
+
+
+# --- BLOQUE R 065 ----------------------------------------------------------
+###chequeo de los datos
+prep(ci_recipe)
+
+
+# --- BLOQUE R 066 ----------------------------------------------------------
+##base de control con validacion cruzada por individuo y sexo para evitar pseudorreplicacion para CI igual que CS
+
+set.seed(123)
+
+cv_ci =
+  group_vfold_cv(
+    ci_train,
+    v = 10,
+    repeats=5,
+    group = Ind,
+    strata = Sexo)
+
+
+# --- BLOQUE R 067 ----------------------------------------------------------
+##metricas para extraer de CI la formula es la misma
+
+metricas =
+  metric_set(
+    accuracy,
+    sens,
+    spec,
+    bal_accuracy,
+    roc_auc
+  )
+
+ctrl =
+  control_resamples(save_pred = TRUE)
+
+
+# --- BLOQUE R 068 ----------------------------------------------------------
+##arma el workflow para el modelo de CI
+ci_wf =
+  workflow() %>%
+  add_recipe(ci_recipe)
+
+
+# --- BLOQUE R 069 ----------------------------------------------------------
+
+####Modelos para CI###############
+
+# Regresion logistica
+
+
+log_spec_CI =
+  logistic_reg(mode = "classification") %>%
+  set_engine("glm")
+
+log_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(log_spec_CI)
+
+log_res_CI =
+  fit_resamples(
+    log_wf_CI,
+    resamples = cv_ci,
+    control = ctrl,
+    metrics = metricas
+  )
+
+collect_metrics(log_res_CI)   ##metricas CI
+
+
+# --- BLOQUE R 070 ----------------------------------------------------------
+
+# LDA para CI
+
+lda_spec =#igual
+  discrim_linear() %>%
+  set_engine("MASS")
+
+lda_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(lda_spec)
+
+##prueba de los modelos con validacion cruzada igual
+lda_res_CI =
+  fit_resamples(
+    lda_wf_CI,
+    resamples = cv_ci,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(lda_res_CI)
+
+
+# --- BLOQUE R 071 ----------------------------------------------------------
+
+# NAIVE BAYES para CI
+
+#especificacion del modelo
+nb_spec =#mismo motor
+  naive_Bayes() %>%
+  set_engine("klaR")##usa paquete klaR para ajuste
+
+#receta del modelo
+nb_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(nb_spec)
+
+##prueba de los modelos con validacion cruzada
+nb_res_CI =
+  fit_resamples(
+    nb_wf_CI,
+    resamples = cv_ci,
+    metrics = metricas,
+    control = ctrl)
+
+nb_fit_CI =
+  fit(
+    nb_wf_CI,
+    data = ci_train
+  )
+
+
+collect_metrics(nb_res_CI)
+
+
+# --- BLOQUE R 072 ----------------------------------------------------------
+
+# RANDOM FOREST (con tuning ) para CI
+
+rf_spec =#idem motor de busqueda
+  rand_forest(
+    trees = 1000,
+    mtry = tune(),
+    min_n = tune()
+  ) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+rf_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(rf_spec)
+
+rf_grid_CI =
+  grid_regular(
+    mtry(range = c(1, 4)),##entrenamos con todos los split para el nodo con 1,
+    #2, 3 y hasta 4 predictores, va a dar arboles mas y menos aletorios
+    min_n(range = c(2, 20)),
+    levels = 6 #da unos 36 modelos o combinaciones x prueba
+  )
+
+
+set.seed(123)
+
+rf_res_CI =
+  tune_grid(
+    rf_wf_CI,
+    resamples = cv_ci,
+    grid = rf_grid_CI,
+    metrics = metricas,
+    control = ctrl)
+
+collect_metrics(rf_res_CI)
+
+best_rf_CI =
+  select_best(rf_res_CI, metric = "bal_accuracy")
+
+best_rf_CI
+
+
+# --- BLOQUE R 073 ----------------------------------------------------------
+# ELASTIC NET para CI
+
+##regresion logistica con regularizacion, esto todo igual porque aplico el mismo modelo
+enet_spec =
+  logistic_reg(
+    penalty = tune(),#valor de lamda que va a penalizar los coeficientes para obtener los mas pequeños posibles, en este caso esta en automatico
+    mixture = tune()#tipo de penalizacion o alfa, 0 ridge, 1 lasso, entre 0 y 1. automatica tambien
+  ) %>%
+  set_engine("glmnet") %>% #motor de ajuste del modelo
+  set_mode("classification")
+
+enet_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(enet_spec)
+
+#recipe = cómo se procesan datos (imputación + estandarización, etc.)
+#model = qué modelo entrenar
+
+enet_grid =#la grilla es igual ya que usamos siempre los mismos hiperparametros
+  grid_regular(penalty(range = c(-4, 0)), # grilla de combinaciones de las variable a testea y  penalizacion (en escala log)
+    mixture(range = c(0, 1)), # 0=ridge, 1=lasso. valores intermedios = elastic net
+    levels = 10 #se evaluan 10x10 combinaciones alpha y lambda (100 modelos)
+  )
+
+set.seed(123)
+##todos los modelos se prueban con validacion cruzada y se estima balanced accuracy como metrica principal
+enet_res_CI =
+  tune_grid(
+    enet_wf_CI,
+    resamples = cv_ci,
+    grid = enet_grid,
+    control = ctrl,
+    metrics = metricas
+  )
+
+collect_metrics(enet_res_CI)
+
+best_enet_CI =
+  select_best(enet_res_CI, metric = "bal_accuracy") #seleccion y almacenamiento del mejor modelo
+
+best_enet_CI
+
+
+# --- BLOQUE R 074 ----------------------------------------------------------
+
+# SVM lineal CI
+
+
+svm_lin = #tuning igual
+  svm_linear(cost = tune()) %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+svm_lin_wf_CI = 
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(svm_lin)#tuning igual
+
+svm_lin_grid =#idem de parametros
+  grid_regular(cost(range = c(-3, 2)), levels = 10)
+
+
+set.seed(123)
+
+svm_lin_res_CI =
+  tune_grid(
+    svm_lin_wf_CI,
+    resamples = cv_ci,
+    grid = svm_lin_grid,#idem
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(svm_lin_res_CI)
+
+best_svm_lin_CI =
+  select_best(svm_lin_res_CI, metric = "bal_accuracy")
+
+best_svm_lin_CI
+
+
+# --- BLOQUE R 075 ----------------------------------------------------------
+
+# SVM RADIAL CI
+
+svm_rad =#motor y modo igual
+  svm_rbf(
+    cost = tune(),
+    rbf_sigma = tune()
+  ) %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+svm_rad_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(svm_rad)
+
+svm_rad_grid = #iguales hiperparametros
+  grid_regular(
+    cost(range = c(-2, 2)),       
+    rbf_sigma(range = c(-3, -1)),  
+    levels = 6
+  )
+
+set.seed(123)
+
+svm_rad_res_CI =
+  tune_grid(
+    svm_rad_wf_CI,
+    resamples = cv_ci,
+    grid = svm_rad_grid,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(svm_rad_res_CI)
+
+best_svm_rad_CI =
+  select_best(svm_rad_res_CI, metric = "bal_accuracy")
+
+best_svm_rad_CI
+
+
+# --- BLOQUE R 076 ----------------------------------------------------------
+
+# XGBOOST CI
+
+
+xgb_spec =#modelo igual
+  boost_tree(
+    trees = 800,
+    learn_rate = tune(),
+    mtry = tune(),
+    tree_depth = tune(),
+    min_n = tune(),
+    loss_reduction = tune()
+  ) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+xgb_wf_CI =
+  workflow() %>%
+  add_recipe(ci_recipe) %>%
+  add_model(xgb_spec)
+
+xgb_grid_CI =
+  grid_space_filling(
+    learn_rate(range = c(-3, -1)),      # 0.001 a 0.1
+    mtry(range = c(1, 4)),
+    tree_depth(range = c(2L, 6L)),      # profundidad moderada
+    min_n(range = c(2L, 15L)),
+    loss_reduction(range = c(-5, -1)),  # 1e-5 a 0.1
+    size = 25
+  )
+
+set.seed(123)
+
+xgb_res_CI =
+  tune_grid(
+    xgb_wf_CI,
+    resamples = cv_ci,
+    grid = xgb_grid_CI,
+    metrics = metricas,
+    control = ctrl
+  )
+
+collect_metrics(xgb_res_CI)
+
+best_xgb_CI =
+  select_best(xgb_res_CI, metric = "bal_accuracy")
+
+best_xgb_CI
+
+
+# --- BLOQUE R 077 ----------------------------------------------------------
+##recoleccion de la metrica de clasificacion para CI
+
+############################################################
+## FUNCIONES AUXILIARES (si ya las definiste en CS, no repetir)
+############################################################
+
 extraer_simple <- function(res_obj, nombre_modelo) {
   collect_metrics(res_obj, summarize = FALSE) %>%
     dplyr::filter(.metric == "bal_accuracy") %>%
@@ -559,9 +1565,12 @@ extraer_simple <- function(res_obj, nombre_modelo) {
 }
 
 extraer_tuneado <- function(res_obj, nombre_modelo) {
+
   best_id <- select_best(res_obj, metric = "bal_accuracy")$.config
+
   collect_metrics(res_obj, summarize = FALSE) %>%
-    dplyr::filter(.metric == "bal_accuracy", .config == best_id) %>%
+    dplyr::filter(.metric == "bal_accuracy",
+                  .config == best_id) %>%
     dplyr::summarise(
       mean_BA = mean(.estimate),
       sd_BA   = sd(.estimate)
@@ -569,310 +1578,13 @@ extraer_tuneado <- function(res_obj, nombre_modelo) {
     dplyr::mutate(modelo = nombre_modelo)
 }
 
-# Recopilar comparación
-comparacion_modelos_CS <-
-  bind_rows(
-    extraer_simple(log_res, "Logistic"),
-    extraer_tuneado(enet_res, "Elastic Net"),
-    extraer_simple(lda_res, "LDA"),
-    extraer_simple(nb_res, "Naive Bayes"),
-    extraer_tuneado(rf_res, "Random Forest"),
-    extraer_tuneado(svm_lin_res, "SVM Linear"),
-    extraer_tuneado(svm_rad_res, "SVM Radial"),
-    extraer_tuneado(xgb_res, "XGBoost")
-  ) %>%
-  dplyr::arrange(desc(mean_BA))
+############################################################
+## RECOLECCIÓN ROBUSTA DE MÉTRICAS – CI
+############################################################
 
-print(comparacion_modelos_CS)
-
-# Seleccionar el mejor modelo basado en mean_BA (XGBoost suele ganar según el script original)
-best_model_name_CS <- comparacion_modelos_CS$modelo[1]
-cat("El mejor modelo para CS es:", best_model_name_CS, "\n")
-
-# 14: Entrenamiento Final y Predicción del Mejor Modelo para CS
-# Entrena el modelo final de CS con todo el conjunto de entrenamiento y lo evalúa en el de testeo.
-
-# Basado en el script original, se asume que XGBoost fue el mejor (índice 8)
-# Si el orden cambia, este paso debe ajustarse.
-if(best_model_name_CS == "XGBoost") {
-  best_config_xgb <- select_best(xgb_res, metric = "bal_accuracy")
-  xgb_final_wf <- finalize_workflow(xgb_wf, best_config_xgb)
-  xgb_fit <- fit(xgb_final_wf, data = cs_train)
-  
-  # Predicciones en test
-  xgb_pred <- predict(xgb_fit, cs_test, type = "prob") %>%
-    bind_cols(predict(xgb_fit, cs_test)) %>%
-    bind_cols(dplyr::select(cs_test, Sexo))
-  
-  xgb_pred$Sexo <- as.factor(xgb_pred$Sexo)
-  
-  # Métricas finales en test
-  final_metrics_cs <- metricas(xgb_pred, truth = Sexo, estimate = .pred_class)
-  print(final_metrics_cs)
-  
-  # AUC
-  auc_value_cs <- roc_auc(xgb_pred, truth = Sexo, .pred_F)
-  print(auc_value_cs)
-  
-  # Curva ROC
-  roc_plot_cs <- roc_curve(xgb_pred, truth = Sexo, .pred_F) %>%
-    autoplot()
-  print(roc_plot_cs)
-  ggsave("ROC_CS.jpg", plot = roc_plot_cs, width = 20, height = 15, units = "cm", dpi = 300)
-  
-} else {
-  stop("El mejor modelo para CS no es XGBoost. Este script está configurado para continuar con XGBoost. Ajuste manual requerido.")
-}
-
-# 15: Bootstrap de Intervalos de Confianza en Test para CS
-# Calcula intervalos de confianza bootstrap para las métricas del modelo final de CS en el conjunto de testeo.
-
-library(boot)
-
-boot_metricas <- function(data, indices) {
-  d <- data[indices, ]
-  # Asegurar que .pred_class sea factor con los mismos niveles que Sexo
-  d$.pred_class <- factor(d$.pred_class, levels = levels(d$Sexo))
-  c(
-    bal_acc = bal_accuracy(d, truth = Sexo, estimate = .pred_class)$.estimate,
-    sens    = sens(d, truth = Sexo, estimate = .pred_class)$.estimate,
-    spec    = spec(d, truth = Sexo, estimate = .pred_class)$.estimate,
-    acc     = accuracy(d, truth = Sexo, estimate = .pred_class)$.estimate
-  )
-}
-
-set.seed(123)
-boot_res_cs <- boot(
-  data = xgb_pred,
-  statistic = boot_metricas,
-  R = 2000
-)
-
-# Intervalos de confianza percentiles 95%
-cat("\n--- Intervalos de Confianza Bootstrap (95%) para CS ---\n")
-print(boot.ci(boot_res_cs, type = "perc", index = 1)) # Balanced Acc
-print(boot.ci(boot_res_cs, type = "perc", index = 2)) # Sensibilidad
-print(boot.ci(boot_res_cs, type = "perc", index = 3)) # Especificidad
-print(boot.ci(boot_res_cs, type = "perc", index = 4)) # Accuracy
-
-# 16: Análisis de Umbral y Matriz de Confusión para CS
-# Analiza el umbral óptimo y genera la matriz de confusión para el modelo final de CS.
-
-# Gráfico de Sensibilidad y Especificidad vs Umbral
-threshold_df_cs <- roc_curve(xgb_pred, truth = Sexo, .pred_F) %>%
-  dplyr::select(.threshold, sensitivity, specificity)
-
-p_thresh_cs <- ggplot(threshold_df_cs, aes(x = .threshold)) +
-  geom_line(aes(y = sensitivity, color = "Sensibilidad"), size = 1) +
-  geom_line(aes(y = specificity, color = "Especificidad"), size = 1) +
-  scale_color_manual(values = c("Sensibilidad" = "red", "Especificidad" = "blue")) +
-  theme_minimal(base_size = 14) +
-  labs(
-    x = "Umbral",
-    y = "Valor",
-    color = " ",
-    title = "Sensibilidad y Especificidad según Umbral (XGBoost - CS)"
-  )
-print(p_thresh_cs)
-
-# Umbral más balanceado (dif mínima entre sens y spec)
-best_threshold_cs <- threshold_df_cs %>%
-  dplyr::mutate(diff = abs(sensitivity - specificity)) %>%
-  dplyr::arrange(diff) %>%
-  dplyr::slice(1)
-print(best_threshold_cs)
-
-# Matriz de confusión
-conf_mat_cs <- conf_mat(xgb_pred, truth = Sexo, estimate = .pred_class)
-print(conf_mat_cs)
-
-# 17: Importancia de Variables para CS
-# Calcula y grafica la importancia de las variables para el modelo final de CS.
-
-# Importancia de variables (VIP)
-xgb_importance <- xgb_fit %>%
-  extract_fit_parsnip() %>%
-  vip::vi()
-
-# Gráfico de importancia
-p_vip_cs <- vip(xgb_fit, num_features = 10, geom = "col", aesthetics = list(fill = "steelblue"))
-print(p_vip_cs)
-ggsave("Var_Imp_CS.jpg", plot = p_vip_cs, width = 20, height = 15, units = "cm", dpi = 300)
-
-# 18: Análisis SHAP para CS
-# Calcula y visualiza las contribuciones SHAP de las variables para el modelo final de CS.
-
-# Extraer modelo core
-xgb_core <- extract_fit_parsnip(xgb_fit)$fit
-
-# Obtener datos procesados por la receta
-rec <- extract_recipe(xgb_fit)
-X_df <- bake(rec, new_data = cs_train) %>%
-  dplyr::select(-Sexo)
-
-X_matrix <- as.matrix(X_df)
-
-# Calcular SHAP
-sv <- shapviz(
-  xgb_core,
-  X = X_matrix,
-  X_pred = X_matrix,
-  baseline = "auto"
-)
-
-# Gráfico de importancia SHAP
-p_shap_imp_cs <- sv_importance(sv, kind = "beeswarm")
-print(p_shap_imp_cs)
-ggsave("Shap_CS.jpg", plot = p_shap_imp_cs, width = 20, height = 15, units = "cm", dpi = 300)
-
-# Gráficos de dependencia SHAP
-vars_shap <- c("MDCu", "BLCu", "BLCo", "MDCo")
-plots_shap <- lapply(vars_shap, function(v) {
-  sv_dependence(sv, v) +
-    ggtitle(paste("Dependencia SHAP -", v)) +
-    theme_minimal(base_size = 12)
-})
-p_shap_dep_cs <- wrap_plots(plots_shap, ncol = 2)
-print(p_shap_dep_cs)
-
-# 19: Preparación de Datos para Caninos Inferiores (CI)
-# Repite pasos similares para el dataset de Caninos Inferiores (CI).
-
-CI <- Dent %>%
-  dplyr::filter(Tipo_Diente == "CI")
-
-# Inspección de CI
-print(summary(CI[, c("MDCo", "BLCo", "MDCu", "BLCu")]))
-print(table(CI$Sexo))
-print(length(unique(CI$Ind)))
-cat("Dataset CI balanceado y con pocos datos faltantes\n")
-
-# Guardar archivo de CI para análisis posteriores
-write.table(
-  CI,
-  file = "caninos_inferiores.txt",
-  sep = "\t",
-  row.names = FALSE
-)
-
-# 20: División y Preparación de Datos para CI
-# Divide los datos de CI y define la receta de preprocesamiento.
-
-# Dividir la muestra CI
-ci_split <- split_dentales(CI)
-ci_train <- ci_split$train
-ci_test <- ci_split$test
-
-# Verificar divisiones
-print(summary(ci_train))
-print(summary(ci_test))
-print(paste("Intersección de individuos entre train y test (CI):", length(intersect(unique(ci_train$Ind), unique(ci_test$Ind)))))
-
-# Definir receta de preprocesamiento para CI
-ci_recipe <- recipe(Sexo ~ MDCo + BLCo + MDCu + BLCu, data = ci_train) %>%
-  step_impute_knn(all_predictors()) %>%
-  step_normalize(all_predictors())
-
-# Preparar la receta
-ci_recipe_prep <- prep(ci_recipe)
-
-# Configurar validación cruzada para CI
-set.seed(123)
-cv_ci <- group_vfold_cv(
-  ci_train,
-  v = 10,
-  repeats = 5,
-  group = Ind,
-  strata = Sexo
-)
-
-# 21: Evaluación de Modelos para CI
-# Evalúa los mismos modelos utilizados para CS en el conjunto de validación cruzada de CI.
-
-# Reutilizamos las mismas especificaciones de modelos, cambiando solo el workflow y los datos.
-# Regresión Logística CI
-log_res_CI <- fit_resamples(
-  log_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(log_res_CI))
-
-# LDA CI
-lda_res_CI <- fit_resamples(
-  lda_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(lda_res_CI))
-
-# Naive Bayes CI
-nb_res_CI <- fit_resamples(
-  nb_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(nb_res_CI))
-
-# Random Forest CI
-rf_res_CI <- tune_grid(
-  rf_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  grid = rf_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(rf_res_CI))
-
-# Elastic Net CI
-enet_res_CI <- tune_grid(
-  enet_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  grid = enet_grid,
-  control = ctrl,
-  metrics = metricas
-)
-print(collect_metrics(enet_res_CI))
-
-# SVM Lineal CI
-svm_lin_res_CI <- tune_grid(
-  svm_lin_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  grid = svm_lin_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(svm_lin_res_CI))
-
-# SVM Radial CI
- <- tune_grid(
-  svm_rad_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  grid = svm_rad_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(svm_rad_res_CI))
-
-# XGBoost CI
-xgb_res_CI <- tune_grid(
-  xgb_wf, # Reutiliza el workflow de CS con receta de CI
-  resamples = cv_ci,
-  grid = xgb_grid,
-  metrics = metricas,
-  control = ctrl
-)
-print(collect_metrics(xgb_res_CI))
-
-# 22: Comparación y Selección del Mejor Modelo para CI
-# Resume las métricas de los modelos para CI y selecciona el mejor.
-
-# Recopilar comparación para CI
 comparacion_modelos_CI <-
   bind_rows(
+
     extraer_simple(log_res_CI, "Logistic"),
     extraer_tuneado(enet_res_CI, "Elastic Net"),
     extraer_simple(lda_res_CI, "LDA"),
@@ -881,89 +1593,256 @@ comparacion_modelos_CI <-
     extraer_tuneado(svm_lin_res_CI, "SVM Linear"),
     extraer_tuneado(svm_rad_res_CI, "SVM Radial"),
     extraer_tuneado(xgb_res_CI, "XGBoost")
+
   ) %>%
   dplyr::arrange(desc(mean_BA))
 
-print(comparacion_modelos_CI)
+comparacion_modelos_CI
 
-# Seleccionar el mejor modelo basado en mean_BA (SVM Radial suele ganar según el script original)
-best_model_name_CI <- comparacion_modelos_CI$modelo[1]
-cat("El mejor modelo para CI es:", best_model_name_CI, "\n")
 
-# 23: Entrenamiento Final y Predicción del Mejor Modelo para CI
-# Entrena el modelo final de CI y lo evalúa en el de testeo.
 
-# Basado en el script original, se asume que SVM Radial fue el mejor (índice 7)
-if(best_model_name_CI == "SVM Radial") {
-  best_config_svm_rad_CI <- select_best(svm_rad_res_CI, metric = "bal_accuracy")
-  svm_rad_final_wf_CI <- finalize_workflow(svm_rad_wf, best_config_svm_rad_CI)
-  svm_rad_fit_CI <- fit(svm_rad_final_wf_CI, data = ci_train)
-  
-  # Predicciones en test
-  svm_pred_CI <- predict(svm_rad_fit_CI, ci_test, type = "prob") %>%
-    bind_cols(predict(svm_rad_fit_CI, ci_test)) %>%
-    bind_cols(dplyr::select(ci_test, Sexo))
-  
-  svm_pred_CI$Sexo <- as.factor(svm_pred_CI$Sexo)
-  
-  # Métricas finales en test
-  final_metrics_ci <- metricas(svm_pred_CI, truth = Sexo, estimate = .pred_class)
-  print(final_metrics_ci)
-  
-  # AUC
-  auc_value_ci <- roc_auc(svm_pred_CI, truth = Sexo, .pred_F)
-  print(auc_value_ci)
-  
-  # Curva ROC
-  roc_plot_ci <- roc_curve(svm_pred_CI, truth = Sexo, .pred_F) %>%
-    autoplot()
-  print(roc_plot_ci)
-  ggsave("ROC_CI.jpg", plot = roc_plot_ci, width = 20, height = 15, units = "cm", dpi = 300)
-  
-} else {
-  stop("El mejor modelo para CI no es SVM Radial. Este script está configurado para continuar con SVM Radial. Ajuste manual requerido.")
-}
 
-# 24: Análisis de Umbral, Distribución de Probabilidades y Matriz de Confusión para CI
-# Analiza el umbral óptimo, distribución de probabilidades y genera la matriz de confusión para el modelo final de CI.
+# --- BLOQUE R 078 ----------------------------------------------------------
+## Comparación estadística entre modelos - CI
 
-# Gráfico de Sensibilidad y Especificidad vs Umbral (CI)
-threshold_df_CI <- roc_curve(svm_pred_CI, truth = Sexo, .pred_F) %>%
+resamples_CI <-
+  bind_rows(
+    
+    extraer_resamples_simple(log_res_CI, "Logistic"),
+    extraer_resamples_tuneado(enet_res_CI, "Elastic Net"),
+    extraer_resamples_simple(lda_res_CI, "LDA"),
+    extraer_resamples_simple(nb_res_CI, "Naive Bayes"),
+    extraer_resamples_tuneado(rf_res_CI, "Random Forest"),
+    extraer_resamples_tuneado(svm_lin_res_CI, "SVM Linear"),
+    extraer_resamples_tuneado(svm_rad_res_CI, "SVM Radial"),
+    extraer_resamples_tuneado(xgb_res_CI, "XGBoost")
+    
+  )
+
+## check
+resamples_CI
+
+# --- BLOQUE R 079 ----------------------------------------------------------
+## matriz
+
+resamples_CI_wide <-
+  resamples_CI %>%
+  select(id, id2, modelo, .estimate) %>%
+  tidyr::pivot_wider(
+    names_from = modelo,
+    values_from = .estimate
+  )
+
+## check
+dim(resamples_CI_wide)
+head(resamples_CI_wide)
+
+# --- BLOQUE R 080 ----------------------------------------------------------
+##Friedman (global y comparacion de a pares)
+friedman.test(
+  y = as.matrix(
+    resamples_CI_wide %>%
+      select(
+        Logistic,
+        `Elastic Net`,
+        LDA,
+        `Naive Bayes`,
+        `Random Forest`,
+        `SVM Linear`,
+        `SVM Radial`,
+        XGBoost
+      ))
+)
+
+# --- BLOQUE R 081 ----------------------------------------------------------
+
+##Wilcoxon pareado + Holm entre pares
+
+datos_CI <- resamples_CI_wide %>%
+  select(
+    id, id2,
+    Logistic,
+    `Elastic Net`,
+    LDA,
+    `Naive Bayes`,
+    `Random Forest`,
+    `SVM Linear`,
+    `SVM Radial`,
+    XGBoost
+  )
+
+modelos <- names(datos_CI)[3:10]
+
+comparaciones_CI <- combn(modelos, 2, simplify = FALSE) %>%
+  map_dfr(function(par) {
+    
+    test <- wilcox.test(
+      datos_CI[[par[1]]],
+      datos_CI[[par[2]]],
+      paired = TRUE,
+      exact = FALSE
+    )
+    
+    tibble(
+      modelo_1 = par[1],
+      modelo_2 = par[2],
+      p = test$p.value
+    )
+    
+  }) %>%
+  mutate(
+    p_ajustado = p.adjust(p, method = "holm")
+  ) %>%
+  arrange(p_ajustado)
+
+##ver
+print(comparaciones_CI, n=28)
+
+
+# --- BLOQUE R 082 ----------------------------------------------------------
+##diferencias medias de BA entre modelos
+resamples_CI_wide %>%
+  summarise(
+    XGB_vs_RF = mean(XGBoost - `Random Forest`),
+    XGB_vs_SVMrad = mean(XGBoost - `SVM Radial`),
+    XGB_vs_NB = mean(XGBoost - `Naive Bayes`),
+    XGB_vs_EN = mean(XGBoost - `Elastic Net`),
+    XGB_vs_Logistic = mean(XGBoost - Logistic),
+    XGB_vs_SVMlin = mean(XGBoost - `SVM Linear`),
+    XGB_vs_LDA = mean(XGBoost - LDA)
+  )
+
+# --- BLOQUE R 083 ----------------------------------------------------------
+##Extraer mejor SVM radial del modelo entrenado
+best_svm_rad_CI <- select_best(
+  svm_rad_res_CI,
+  metric = "bal_accuracy"
+)
+
+#cerrar workflow
+svm_rad_final_wf_CI <-
+  finalize_workflow(
+    svm_rad_wf_CI,
+    best_svm_rad_CI
+  )
+
+#volver a correr con training
+svm_rad_fit_CI <-
+  fit(
+    svm_rad_final_wf_CI,
+    data = ci_train
+  )
+
+
+# --- BLOQUE R 084 ----------------------------------------------------------
+##Predecir con SVM radial sobre test set
+
+svm_pred_CI =
+  predict(svm_rad_fit_CI, ci_test, type = "prob") %>%
+  bind_cols(predict(svm_rad_fit_CI, ci_test)) %>%
+  bind_cols(dplyr::select(ci_test, Sexo))
+
+svm_pred_CI$Sexo = as.factor(svm_pred_CI$Sexo)
+
+
+# --- BLOQUE R 085 ----------------------------------------------------------
+##Metricas para SVM radial
+
+metricas_clase(
+  svm_pred_CI,
+  truth = Sexo,
+  estimate = .pred_class
+)
+
+roc_auc(
+  svm_pred_CI,
+  truth = Sexo,
+  .pred_F
+)
+
+
+# --- BLOQUE R 086 ----------------------------------------------------------
+############################################################
+## BOOTSTRAP DEL TEST SET – CI (SVM Radial)
+############################################################
+
+boot_res_CI <- boot(
+  data = svm_pred_CI,
+  statistic = boot_metricas,
+  R = 2000
+)
+
+# Balanced Accuracy
+boot.ci(boot_res_CI, type = "perc", index = 1)
+
+# Sensibilidad
+boot.ci(boot_res_CI, type = "perc", index = 2)
+
+# Especificidad
+boot.ci(boot_res_CI, type = "perc", index = 3)
+
+# Accuracy
+boot.ci(boot_res_CI, type = "perc", index = 4)
+
+
+# --- BLOQUE R 087 ----------------------------------------------------------
+roc_curve(
+  svm_pred_CI,
+  truth = Sexo,
+  .pred_F
+) %>%
+  autoplot()
+
+
+# --- BLOQUE R 088 ----------------------------------------------------------
+ggsave("ROC_CI.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+# --- BLOQUE R 089 ----------------------------------------------------------
+
+# Tabla Sensibilidad – Especificidad
+
+threshold_df_CI =
+  roc_curve(svm_pred_CI, truth = Sexo, .pred_F) %>%
   dplyr::select(.threshold, sensitivity, specificity)
 
-p_thresh_ci <- ggplot(threshold_df_CI, aes(x = .threshold)) +
+
+# Gráfico
+
+ggplot(threshold_df_CI, aes(x = .threshold)) +
   geom_line(aes(y = sensitivity, color = "Sensibilidad"), size = 1) +
   geom_line(aes(y = specificity, color = "Especificidad"), size = 1) +
-  scale_color_manual(values = c("Sensibilidad" = "red", "Especificidad" = "blue")) +
+  scale_color_manual(values = c("Sensibilidad" = "red",
+                                "Especificidad" = "blue")) +
   theme_minimal(base_size = 14) +
   labs(
     x = "Umbral",
     y = "Valor",
-    color = " ",
-    title = "Sensibilidad y Especificidad según Umbral (SVM Radial - CI)"
+    color = "",
+    title = "Sensibilidad y Especificidad según Umbral (SVM Radial)"
   )
-print(p_thresh_ci)
 
-# Distribución de probabilidades
-p_dist_prob_ci <- ggplot(svm_pred_CI, aes(x = .pred_F, fill = Sexo)) +
+
+# --- BLOQUE R 090 ----------------------------------------------------------
+##DEistribucion de probabilidades por clase
+ggplot(svm_pred_CI,
+       aes(x = .pred_F,
+           fill = Sexo)) +
   geom_density(alpha = 0.4) +
   theme_minimal(base_size = 14) +
   labs(
     x = "Probabilidad predicha de F",
-    y = "Densidad",
-    title = "Distribución de Probabilidades (SVM Radial - CI)"
+    y = "Densidad"
   )
-print(p_dist_prob_ci)
-ggsave("Dist_prob.jpg", plot = p_dist_prob_ci, width = 20, height = 15, units = "cm", dpi = 300)
 
-# Matriz de confusión
-conf_mat_ci <- conf_mat(svm_pred_CI, truth = Sexo, estimate = .pred_class)
-print(conf_mat_ci)
 
-# 25: Importancia de Variables para CI
-# Calcula la importancia de las variables para el modelo final de CI usando permutación.
+# --- BLOQUE R 091 ----------------------------------------------------------
+ggsave("Dist_prob.jpg", width = 20, height = 15, units = "cm", dpi = 300)
 
-# Preparar datos para cálculo de importancia
+# --- BLOQUE R 092 ----------------------------------------------------------
+##usar un esquema de permutaciones para estimar la importancia de las variables SVM
+##library(vip)#Uso vip pero hay conflicto entre paquetes recordar vip::vi
+
+
 ci_test_imp <- ci_test %>%
   dplyr::select(Sexo, MDCo, BLCo, MDCu, BLCu)
 
@@ -971,7 +1850,7 @@ set.seed(123)
 imp_ci <- vip::vi(
   svm_rad_fit_CI,
   method = "permute",
-  train = ci_test_imp,
+  train = ci_test_imp ,
   target = "Sexo",
   metric = "bal_accuracy",
   pred_wrapper = function(object, newdata) {
@@ -987,110 +1866,107 @@ imp_ci_summary <- imp_ci %>%
     sd_imp   = sd(Importance)
   )
 
-print(imp_ci_summary)
+#check
+print(imp_ci_summary) 
 
-# Gráfico de importancia
-p_imp_ci <- ggplot(imp_ci_summary,
-       aes(x = reorder(Variable, mean_imp), y = mean_imp)) +
+# --- BLOQUE R 093 ----------------------------------------------------------
+ggplot(imp_ci_summary,
+       aes(x = reorder(Variable, mean_imp),
+           y = mean_imp)) +
   geom_col(fill = "steelblue") +
-  geom_errorbar(aes(ymin = mean_imp - sd_imp, ymax = mean_imp + sd_imp), width = 0.2) +
+  geom_errorbar(aes(ymin = mean_imp - sd_imp,
+                    ymax = mean_imp + sd_imp),
+                width = 0.2) +
   coord_flip() +
   theme_minimal(base_size = 14) +
   labs(
     x = "",
-    y = "Permutation Importance (Δ Balanced Accuracy)",
-    title = "Variable Importance – SVM Radial (CI)"
+    y = "Importancia (Δ Balanced Accuracy)"
   )
-print(p_imp_ci)
-ggsave("Variable_imp_CI.jpg", plot = p_imp_ci, width = 20, height = 15, units = "cm", dpi = 300)
 
-# 26: Gráfico de Superficie de Decisión para CI
-# Visualiza la superficie de decisión del modelo final de CI en un subespacio de variables.
 
-# Crear grilla para la superficie de decisión (ej: MDCu vs MDCo)
+# --- BLOQUE R 094 ----------------------------------------------------------
+ggsave("Variable_imp_CI.jpg", width = 20, height = 15, units = "cm", dpi = 300)
+
+# --- BLOQUE R 095 ----------------------------------------------------------
+#Grafico del espacio clasificatorio para MDCu y MDCo
+
 grid_data <- expand.grid(
-  MDCu = seq(min(ci_test$MDCu, na.rm = TRUE), max(ci_test$MDCu, na.rm = TRUE), length.out = 100),
-  MDCo = seq(min(ci_test$MDCo, na.rm = TRUE), max(ci_test$MDCo, na.rm = TRUE), length.out = 100)
+  MDCu = seq(min(ci_test$MDCu, na.rm = TRUE),
+             max(ci_test$MDCu, na.rm = TRUE),
+             length.out = 100),
+  MDCo = seq(min(ci_test$MDCo, na.rm = TRUE),
+             max(ci_test$MDCo, na.rm = TRUE),
+             length.out = 100)
 )
+
+# fijamos las otras variables en la media
 grid_data$BLCu <- mean(ci_test$BLCu, na.rm = TRUE)
 grid_data$BLCo <- mean(ci_test$BLCo, na.rm = TRUE)
 
-# Predecir en la grilla
-grid_pred <- predict(svm_rad_fit_CI, grid_data, type = "prob")
+
+# --- BLOQUE R 096 ----------------------------------------------------------
+#predecir grilla
+grid_pred <- predict(
+  svm_rad_fit_CI,
+  grid_data,
+  type = "prob"
+)
+
 
 grid_plot <- cbind(grid_data, grid_pred)
 
-# Filtrar datos de test para plotear puntos
-ci_test_clean <- ci_test %>%
-  dplyr::filter(!is.na(MDCu), !is.na(MDCo))
 
-# Plotear superficie y puntos
-p_surf_ci <- ggplot() +
+# --- BLOQUE R 097 ----------------------------------------------------------
+#Filtrar valores NA
+
+ci_test_clean <- ci_test %>%
+  filter(!is.na(MDCu), !is.na(MDCo))
+
+#plot
+ggplot() +
   geom_raster(
     data = grid_plot,
-    aes(x = MDCu, y = MDCo, fill = .pred_F)
+    aes(x = MDCu,
+        y = MDCo,
+        fill = .pred_F)
   ) +
   scale_fill_viridis_c() +
   geom_point(
     data = ci_test_clean,
-    aes(x = MDCu, y = MDCo, shape = Sexo),
+    aes(x = MDCu,
+        y = MDCo,
+        shape = Sexo),
     size = 3,
     color = "black"
   ) +
   theme_minimal(base_size = 14) +
   labs(
-    title = "Superficie de decisión – SVM Radial (CI)",
     x = "MDCu",
     y = "MDCo",
     fill = "P(F)"
   )
-print(p_surf_ci)
-ggsave("SVM_sup.jpg", plot = p_surf_ci, width = 20, height = 15, units = "cm", dpi = 300)
 
-# 27: Resumen Final y Guardado de Resultados
-# Presenta un resumen comparativo final y guarda los modelos entrenados y los conjuntos de testeo.
 
-# Tabla resumen de resultados finales
-results_summary <- data.frame(
-  Diente = c("CS", "CI"),
-  Modelo_Final = c("XGBoost", "SVM Radial"),
-  BA = c(final_metrics_cs %>% filter(.metric == "bal_accuracy") %>% pull(.estimate),
-         final_metrics_ci %>% filter(.metric == "bal_accuracy") %>% pull(.estimate)),
-  IC95_BA = c(
-    paste0(round(boot.ci(boot_res_cs, type = "perc", index = 1)$percent[4], 2), " – ", round(boot.ci(boot_res_cs, type = "perc", index = 1)$percent[5], 2)),
-    paste0(round(boot.ci(boot_res_CI, type = "perc", index = 1)$percent[4], 2), " – ", round(boot.ci(boot_res_CI, type = "perc", index = 1)$percent[5], 2))
-  ),
-  Sens = c(final_metrics_cs %>% filter(.metric == "sens") %>% pull(.estimate),
-           final_metrics_ci %>% filter(.metric == "sens") %>% pull(.estimate)),
-  IC95_Sens = c(
-    paste0(round(boot.ci(boot_res_cs, type = "perc", index = 2)$percent[4], 2), " – ", round(boot.ci(boot_res_cs, type = "perc", index = 2)$percent[5], 2)),
-    paste0(round(boot.ci(boot_res_CI, type = "perc", index = 2)$percent[4], 2), " – ", round(boot.ci(boot_res_CI, type = "perc", index = 2)$percent[5], 2))
-  ),
-  Spec = c(final_metrics_cs %>% filter(.metric == "spec") %>% pull(.estimate),
-           final_metrics_ci %>% filter(.metric == "spec") %>% pull(.estimate)),
-  IC95_Spec = c(
-    paste0(round(boot.ci(boot_res_cs, type = "perc", index = 3)$percent[4], 2), " – ", round(boot.ci(boot_res_cs, type = "perc", index = 3)$percent[5], 2)),
-    paste0(round(boot.ci(boot_res_CI, type = "perc", index = 3)$percent[4], 2), " – ", round(boot.ci(boot_resperc", index = 3)$percent[5], 2))
-  ),
-  AUC = c(auc_value_cs$.estimate, auc_value_ci$.estimate)
-)
 
-print(results_summary)
+# --- BLOQUE R 098 ----------------------------------------------------------
+ggsave("SVM_sup.jpg", width = 20, height = 15, units = "cm", dpi = 300)
 
-# Guardar modelos entrenados
+# --- BLOQUE R 099 ----------------------------------------------------------
+##salvar modelo CS
 saveRDS(xgb_fit, "xgb_fit_CS.rds")
 saveRDS(svm_rad_fit_CI, "svm_rad_fit_CI.rds")
 
-# Guardar conjuntos de testeo
-write.table(cs_test, "Conjunto_testeo_CS.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-write.table(ci_test, "Conjunto_testeo_CI.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+#test data cs
+write.table(cs_test,"Conjunto_testeo.txt", sep = "\t",row.names = FALSE,
+            quote = FALSE)
 
-cat("\n--- Proceso completado ---\n")
-cat("- Modelos guardados: 'xgb_fit_CS.rds', 'svm_rad_fit_CI.rds'\n")
-cat("- Conjuntos de testeo guardados: 'Conjunto_testeo_CS.txt', 'Conjunto_testeo_CI.txt'\n")
-cat("- Gráficos guardados en el directorio actual.\n")
+#salvar modelo CI
+write.table(ci_test,"Conjunto_testeo_CI.txt", sep = "\t",row.names = FALSE,
+            quote = FALSE)
 
 
+# --- BLOQUE R 100 ----------------------------------------------------------
 # === INFORMACIÓN DE LA SESIÓN ===
 
 session_info <- sessionInfo()
@@ -1105,7 +1981,7 @@ cat("\n\n", "========================================\n",
     paste(names(session_info$otherPkgs), sessionInfo()$otherPkgs$ver, 
           sep=" v", collapse="\n  - "),
     "\n\n", "========================================\n\n",
-    file = "session_info_ajuste_modelos.txt", append = FALSE)
+    file = "session_info_seleccion de modelos.txt", append = FALSE)
 
 
 # Tiempo de ejecución aproximado: ~1800-2000 segundos (30-35 minutos)
