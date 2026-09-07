@@ -1754,6 +1754,14 @@ metricas_clase(
   estimate = .pred_class
 )
 
+## Matriz de confusión para SVM radial
+
+conf_mat(svm_pred_CI,
+  truth = Sexo,
+  estimate = .pred_class)
+
+#ROC
+
 roc_auc(
   svm_pred_CI,
   truth = Sexo,
